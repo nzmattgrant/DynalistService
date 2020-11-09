@@ -1,0 +1,15 @@
+{
+  "name": "dynalist-service",
+  "version": "1.0.0",
+  "main": "update-dynalist.js",
+  "license": "MIT",
+  "dependencies": {
+    "js-joda": "^1.11.0",
+    "js-joda-locale": "^1.1.0-pre6",
+    "js-joda-timezone": "^2.1.1",
+    "lodash": "^4.17.20",
+    "moment": "^2.29.1",
+    "path": "^0.12.7",
+    "request": "^2.88.2"
+  }
+}
