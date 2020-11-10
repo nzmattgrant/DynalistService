@@ -3,6 +3,7 @@ const request = require('request');
 const path = require('path');
 const _ = require('lodash');
 const { LocalDate, ChronoUnit, Month, DateTimeFormatter } = require('js-joda');
+const moment = require("moment");
 
 
 const capitalizeFirstLetter = (s) => {
@@ -30,59 +31,122 @@ const getPostResponse = async (url, json) => {
 }
 
 const runDynalistUpdates = async () => {
-    const todoDocument = await getPostResponse('https://dynalist.io/api/v1/doc/read',
+
+    var todoDocument = await getPostResponse('https://dynalist.io/api/v1/doc/read',
         {
             token: config.dynalistApiKey,
-            file_id: "AXPTC35zVtBqlrn9sFmD1HhM"
+            file_id: config.dynalistTodoListDocumentId
         }
     );
-    const nodes = todoDocument.nodes;
-    var currentTodosIds = [];
+    var nodes = todoDocument.nodes;
+    //var currentTodosIds = [];
     var tomorrowTodosIds = [];
-    const allTodosNode = null;
-    const allNodesPreUpdateCount = 0;
+    var futureTodosIds = [];
     _.forEach(nodes, node => {
-        // if(node.checked){
-
-        // }
-        // else 
         if (node.id == config.dynalistTodoTodayId) {
             currentTodosIds = node.children || [];
         }
         else if (node.id == config.dynalistTodoTomorrowId) {
             tomorrowTodosIds = node.children || [];
-            console.log(node.children);
         }
-        // if(node.id == config.dynalistTodoAllId){
-        //     allTodosNode = node;
-        //     allNodesPreUpdateCount = node.children ? node.children.length : 0;
-        // }
+        if (node.id == config.dynalistTodoAllId) {
+            futureTodosIds = node.children || [];
+        }
     });
 
-    const todayAndTomorrow = currentTodosIds.concat(tomorrowTodosIds);
-    console.log(todayAndTomorrow);
-    const changes = [];
+    var changes = [];
 
     var positionIndex = 0;
-    _.forEach(todayAndTomorrow, nodeId => {
+    _.forEach(tomorrowTodosIds, nodeId => {
         console.log(nodeId);
         changes.push({
             "action": "move",
             "node_id": nodeId,
+            "parent_id": config.dynalistTodoTodayId,
+            "index": positionIndex
+        });
+        positionIndex = positionIndex + 1;
+    });
+
+    var futureTodos = nodes.filter(n => futureTodosIds.includes(n.id));
+
+    const now = moment();
+    positionIndex = 0;
+    _.forEach(futureTodos, node => {
+        if (now.diff(moment(node.modified), "days") > 7) {
+            changes.push({
+                "action": "move",
+                "node_id": node.id,
+                "parent_id": config.dynalistTodoTodayId,
+                "index": positionIndex
+            });
+            positionIndex = positionIndex + 1;
+        }
+    });
+
+    await getPostResponse('https://dynalist.io/api/v1/doc/edit',
+        {
+            token: config.dynalistApiKey,
+            file_id: config.dynalistTodoListDocumentId,
+            changes: changes
+        }
+    );
+
+    //todo split these out into diffent files
+    changes = [];
+
+    //todo split this into a function
+    todoDocument = await getPostResponse('https://dynalist.io/api/v1/doc/read',
+        {
+            token: config.dynalistApiKey,
+            file_id: config.dynalistTodoListDocumentId
+        }
+    );
+    nodes = todoDocument.nodes;
+    var currentTodos = [];
+    var futureTodos = [];
+    _.forEach(nodes, node => {
+        if (node.id == config.dynalistTodoTodayId) {
+            currentTodos = nodes.filter(n => node.children.includes(n.id)) || [];
+        }
+        if (node.id == config.dynalistTodoAllId) {
+            futureTodos = nodes.filter(n => node.children.includes(n.id)) || [];
+        }
+    });
+
+    currentTodos = currentTodos.sort((a, b) => (a.color || 4) - (b.color || 4))
+
+    positionIndex = 0;
+    _.forEach(currentTodos, node => {
+        changes.push({
+            "action": "move",
+            "node_id": node.id,
+            "parent_id": config.dynalistTodoTodayId,
+            "index": positionIndex
+        });
+        positionIndex = positionIndex + 1;
+    });
+
+    futureTodos = futureTodos.sort((a, b) => (a.color || 4) - (b.color || 4))
+
+    positionIndex = 0;
+    _.forEach(futureTodos, node => {
+        changes.push({
+            "action": "move",
+            "node_id": node.id,
             "parent_id": config.dynalistTodoAllId,
             "index": positionIndex
         });
         positionIndex = positionIndex + 1;
     });
 
-    const result = await getPostResponse('https://dynalist.io/api/v1/doc/edit',
+    await getPostResponse('https://dynalist.io/api/v1/doc/edit',
         {
             token: config.dynalistApiKey,
-            file_id: "AXPTC35zVtBqlrn9sFmD1HhM",
+            file_id: config.dynalistTodoListDocumentId,
             changes: changes
         }
     );
-    return result;
 };
 
 const ensureCorrectYearEntry = async (journalId, journalDocument, monthEntryId, newDate) => {
@@ -135,39 +199,39 @@ const ensureCorrectMonthEntry = async (journalId, journalDocument, lastEntryId, 
 
 const getDocument = async (id) => {
     const document = await getPostResponse('https://dynalist.io/api/v1/doc/read',
-    {
-        token: config.dynalistApiKey,
-        file_id: id
-    });
+        {
+            token: config.dynalistApiKey,
+            file_id: id
+        });
     return document;
 }
 
-const createNewEntry = async (fileId, parentId, content, index=0) => {
+const createNewEntry = async (fileId, parentId, content, index = 0) => {
     await getPostResponse('https://dynalist.io/api/v1/doc/edit',
-            {
-                token: config.dynalistApiKey,
-                file_id: fileId,
-                changes: [{
-                    "action": "insert",
-                    "parent_id": parentId,
-                    "index": index,
-                    "content": content
-                }]
-            }
+        {
+            token: config.dynalistApiKey,
+            file_id: fileId,
+            changes: [{
+                "action": "insert",
+                "parent_id": parentId,
+                "index": index,
+                "content": content
+            }]
+        }
     );
 }
 
 const updateOldEntry = async (fileId, id, content) => {
     await getPostResponse('https://dynalist.io/api/v1/doc/edit',
-            {
-                token: config.dynalistApiKey,
-                file_id: fileId,
-                changes: [{
-                    "action": "edit",
-                    "node_id": id,
-                    "content": content
-                }]
-            }
+        {
+            token: config.dynalistApiKey,
+            file_id: fileId,
+            changes: [{
+                "action": "edit",
+                "node_id": id,
+                "content": content
+            }]
+        }
     );
 }
 
@@ -200,11 +264,17 @@ const createJournalEntries = async () => {
         const day = padDateNumWithZeros(newDate.dayOfMonth().toString());
         const newEntryContent = `!(${newDate.year()}-${month}-${day}) #latest`
         await createNewEntry(journalId, monthEntryId, newEntryContent)
-        journalDocument = await getDocument(journalId);   
-        lastEntry = journalDocument.nodes.find(node => node.content.includes("#latest"));    
+        journalDocument = await getDocument(journalId);
+        lastEntry = journalDocument.nodes.find(node => node.content.includes("#latest"));
     }
+}
+
+const archiveCompletedTodos = () => {
+
 }
 
 createJournalEntries();
 
 runDynalistUpdates();
+
+archiveCompletedTodos()
