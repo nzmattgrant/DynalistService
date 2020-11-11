@@ -332,8 +332,9 @@ var count = 0;
 
 const copyCheckedSubTrees = async (subTrees, parentId) => {
     if (!subTrees || !subTrees.length) {
-        return;
+        return [];
     }
+    var copiedIds = [];
     var changes = [];
     subTrees.forEach((item, i) => {
         count = count + 1;
@@ -343,24 +344,31 @@ const copyCheckedSubTrees = async (subTrees, parentId) => {
             "index": i,
             "content": item.content
         });
+        copiedIds.push(item.id);
+        if(item.id === undefined){
+            console.log(item);
+        }
     });
     var result = await updateDocument(config.journalDocumentId, changes);
+    //await delay(1000);
     var newIds = result.new_node_ids || [];
     //Assumption is that everything is in the same order as what they were passed in as
     //If not it's really annoying
     for (var i = 0; i < subTrees.length; i++) {
-        await copyCheckedSubTrees(subTrees[i].children || [], newIds[i]);
+        const copiedChildIds = await copyCheckedSubTrees(subTrees[i].children || [], newIds[i]);
+        copiedIds = copiedIds.concat(copiedChildIds);
     }
+    return copiedIds;
 }
 
-const getCheckedItemDeleteChanges = (subTrees) => {
+const getCheckedItemDeleteChanges = (subTrees, okToDelete) => {
     var changes = [];
     for (item of subTrees) {
         if (item.children) {
-            const nextChanges = getCheckedItemDeleteChanges(item.children);
+            const nextChanges = getCheckedItemDeleteChanges(item.children, okToDelete);
             changes = changes.concat(nextChanges)
         }
-        if (item.checked) {
+        if (item.checked && okToDelete.includes(item.id)) {
             changes.push({
                 "action": "delete",
                 "node_id": item.id,
@@ -370,11 +378,18 @@ const getCheckedItemDeleteChanges = (subTrees) => {
     return changes;
 }
 
+const delay = (ms) => {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 const moveCheckedSubTrees = async (subTrees, parentId) => {
-    await copyCheckedSubTrees(subTrees, parentId);
-    const changes = getCheckedItemDeleteChanges(subTrees);
+    const copiedIds = await copyCheckedSubTrees(subTrees, parentId);
+    //avoid rate limiting
+    //await delay(30000);
+    const changes = getCheckedItemDeleteChanges(subTrees, copiedIds);
     console.log(count);
-    await updateDocument(config.dynalistTodoListDocumentId, changes);
+    const result = await updateDocument(config.dynalistTodoListDocumentId, changes);
+    console.log(result);
 }
 
 const archiveCompletedTodos = async () => {
@@ -382,20 +397,27 @@ const archiveCompletedTodos = async () => {
     const nodes = document.nodes;
     const todayTodoEntry = nodes.find(item => item.id == config.dynalistTodoTodayId);
     await preprocessSubTrees(todayTodoEntry, nodes);
+    await delay(10000);
     var subTrees = getSubTreesOrNull(todayTodoEntry, nodes);
     subTrees = subTrees && subTrees.children ? subTrees.children : [];
     const journalDocument = await getDocument(config.journalDocumentId);
     const journalNodes = journalDocument.nodes;
     const todayJournalEntry = journalNodes.find(node => node.content.includes("#latest"));
     await moveCheckedSubTrees(subTrees, todayJournalEntry.id);
+    //await delay(10000);
 }
 
 (async () => {
+    //try to avoid rate limiting with the delay
     await createJournalEntries();
+    //await delay(10000);
 
     //await archiveCompletedTodos();
-    
+    //await delay(10000);
+
     await runDynalistUpdates();
+
+    console.log("done");
 })();
 
 
