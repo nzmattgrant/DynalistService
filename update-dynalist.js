@@ -269,12 +269,133 @@ const createJournalEntries = async () => {
     }
 }
 
-const archiveCompletedTodos = () => {
-
+const getSubTreesOrNull = (item, nodes) => {
+    const subTrees = [];
+    if (item.children) {
+        const childrenItems = nodes.filter(node => item.children.includes(node.id))
+        childrenItems.forEach(childItem => {
+            const childAsSubtrees = getSubTreesOrNull(childItem, nodes);
+            if (childAsSubtrees != null) {
+                subTrees.push(childAsSubtrees)
+            }
+        });
+    }
+    if (item.checked || subTrees.length) {
+        return {
+            id: item.id,
+            content: item.content,
+            checked: item.checked || false,
+            children: subTrees
+        };
+    }
+    return null;
 }
 
-createJournalEntries();
+const getPreprocessChanges = async (item, nodes, parentChecked = false) => {
+    var changes = [];
+    if (item.children) {
+        const childrenItems = nodes.filter(node => item.children.includes(node.id))
+        for (childItem of childrenItems) {
+            const nextChanges = await getPreprocessChanges(childItem, nodes, parentChecked || item.checked);
+            changes = changes.concat(nextChanges)
+        }
+    }
+    if (parentChecked && !item.checked) {
+        changes.push({
+            "action": "edit",
+            "node_id": item.id,
+            "checked": true,
+            "content": item.content
+        });
+    }
+    return changes;
+}
 
-runDynalistUpdates();
+const updateDocument = async (documentId, changes) => {
+    return await getPostResponse('https://dynalist.io/api/v1/doc/edit',
+        {
+            token: config.dynalistApiKey,
+            file_id: documentId,
+            changes: changes
+        });
+}
 
-archiveCompletedTodos()
+const preprocessSubTrees = async (item, nodes) => {
+    const changes = await getPreprocessChanges(item, nodes);
+    if (changes.length) {
+        await updateDocument(config.dynalistTodoListDocumentId, changes);
+        console.log("here");
+    }
+}
+
+var count = 0;
+
+const copyCheckedSubTrees = async (subTrees, parentId) => {
+    if (!subTrees || !subTrees.length) {
+        return;
+    }
+    var changes = [];
+    subTrees.forEach((item, i) => {
+        count = count + 1;
+        changes.push({
+            "action": "insert",
+            "parent_id": parentId,
+            "index": i,
+            "content": item.content
+        });
+    });
+    var result = await updateDocument(config.journalDocumentId, changes);
+    var newIds = result.new_node_ids || [];
+    //Assumption is that everything is in the same order as what they were passed in as
+    //If not it's really annoying
+    for (var i = 0; i < subTrees.length; i++) {
+        await copyCheckedSubTrees(subTrees[i].children || [], newIds[i]);
+    }
+}
+
+const getCheckedItemDeleteChanges = (subTrees) => {
+    var changes = [];
+    for (item of subTrees) {
+        if (item.children) {
+            const nextChanges = getCheckedItemDeleteChanges(item.children);
+            changes = changes.concat(nextChanges)
+        }
+        if (item.checked) {
+            changes.push({
+                "action": "delete",
+                "node_id": item.id,
+            });
+        }
+    }
+    return changes;
+}
+
+const moveCheckedSubTrees = async (subTrees, parentId) => {
+    await copyCheckedSubTrees(subTrees, parentId);
+    const changes = getCheckedItemDeleteChanges(subTrees);
+    console.log(count);
+    await updateDocument(config.dynalistTodoListDocumentId, changes);
+}
+
+const archiveCompletedTodos = async () => {
+    const document = await getDocument(config.dynalistTodoListDocumentId);
+    const nodes = document.nodes;
+    const todayTodoEntry = nodes.find(item => item.id == config.dynalistTodoTodayId);
+    await preprocessSubTrees(todayTodoEntry, nodes);
+    var subTrees = getSubTreesOrNull(todayTodoEntry, nodes);
+    subTrees = subTrees && subTrees.children ? subTrees.children : [];
+    const journalDocument = await getDocument(config.journalDocumentId);
+    const journalNodes = journalDocument.nodes;
+    const todayJournalEntry = journalNodes.find(node => node.content.includes("#latest"));
+    await moveCheckedSubTrees(subTrees, todayJournalEntry.id);
+}
+
+(async () => {
+    await createJournalEntries();
+
+    //await archiveCompletedTodos();
+    
+    await runDynalistUpdates();
+})();
+
+
