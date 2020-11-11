@@ -5,14 +5,28 @@ const _ = require('lodash');
 const { LocalDate, ChronoUnit, Month, DateTimeFormatter } = require('js-joda');
 const moment = require("moment");
 
-
-const capitalizeFirstLetter = (s) => {
-    if (typeof s !== 'string') return ''
-    s = s.toLowerCase();
-    return s.charAt(0).toUpperCase() + s.slice(1)
+const delay = (ms) => {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// var timeOfReset = null;
+// var requestsSinceReset = 0;
+var totalRequests = 0
+
 const getPostResponse = async (url, json) => {
+    // if(timeOfReset == null){
+    //     timeOfReset = moment();
+    // }
+    // else if (requestsSinceReset > 59 && moment().diff(moment(timeOfReset), "minutes") < 1){
+    //     requestsSinceReset = 0;
+    //     timeOfReset = moment();
+    //     await delay(60000);//wait another minute to avoid rate limiting
+    // }
+
+    // requestsSinceReset = requestsSinceReset + 1;
+    await delay(1000);//rate limited on requests (one every second);
+    totalRequests = totalRequests + 1;
+
     return new Promise((resolve, reject) => {
         request.post(
             {
@@ -28,6 +42,28 @@ const getPostResponse = async (url, json) => {
             }
         );
     });
+}
+
+const createNewEntry = async (fileId, parentId, content, index = 0) => {
+    await getPostResponse('https://dynalist.io/api/v1/doc/edit',
+        {
+            token: config.dynalistApiKey,
+            file_id: fileId,
+            changes: [{
+                "action": "insert",
+                "parent_id": parentId,
+                "index": index,
+                "content": content
+            }]
+        }
+    );
+}
+
+
+const capitalizeFirstLetter = (s) => {
+    if (typeof s !== 'string') return ''
+    s = s.toLowerCase();
+    return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 const runDynalistUpdates = async () => {
@@ -206,20 +242,7 @@ const getDocument = async (id) => {
     return document;
 }
 
-const createNewEntry = async (fileId, parentId, content, index = 0) => {
-    await getPostResponse('https://dynalist.io/api/v1/doc/edit',
-        {
-            token: config.dynalistApiKey,
-            file_id: fileId,
-            changes: [{
-                "action": "insert",
-                "parent_id": parentId,
-                "index": index,
-                "content": content
-            }]
-        }
-    );
-}
+
 
 const updateOldEntry = async (fileId, id, content) => {
     await getPostResponse('https://dynalist.io/api/v1/doc/edit',
@@ -295,7 +318,7 @@ const getPreprocessChanges = async (item, nodes, parentChecked = false) => {
     var changes = [];
     if (item.children) {
         const childrenItems = nodes.filter(node => item.children.includes(node.id))
-        for (childItem of childrenItems) {
+        for (var childItem of childrenItems) {
             const nextChanges = await getPreprocessChanges(childItem, nodes, parentChecked || item.checked);
             changes = changes.concat(nextChanges)
         }
@@ -363,7 +386,7 @@ const copyCheckedSubTrees = async (subTrees, parentId) => {
 
 const getCheckedItemDeleteChanges = (subTrees, okToDelete) => {
     var changes = [];
-    for (item of subTrees) {
+    for (var item of subTrees) {
         if (item.children) {
             const nextChanges = getCheckedItemDeleteChanges(item.children, okToDelete);
             changes = changes.concat(nextChanges)
@@ -378,14 +401,10 @@ const getCheckedItemDeleteChanges = (subTrees, okToDelete) => {
     return changes;
 }
 
-const delay = (ms) => {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+
 
 const moveCheckedSubTrees = async (subTrees, parentId) => {
     const copiedIds = await copyCheckedSubTrees(subTrees, parentId);
-    //avoid rate limiting
-    //await delay(30000);
     const changes = getCheckedItemDeleteChanges(subTrees, copiedIds);
     console.log(count);
     const result = await updateDocument(config.dynalistTodoListDocumentId, changes);
@@ -397,27 +416,22 @@ const archiveCompletedTodos = async () => {
     const nodes = document.nodes;
     const todayTodoEntry = nodes.find(item => item.id == config.dynalistTodoTodayId);
     await preprocessSubTrees(todayTodoEntry, nodes);
-    await delay(10000);
     var subTrees = getSubTreesOrNull(todayTodoEntry, nodes);
     subTrees = subTrees && subTrees.children ? subTrees.children : [];
     const journalDocument = await getDocument(config.journalDocumentId);
     const journalNodes = journalDocument.nodes;
     const todayJournalEntry = journalNodes.find(node => node.content.includes("#latest"));
     await moveCheckedSubTrees(subTrees, todayJournalEntry.id);
-    //await delay(10000);
 }
 
 (async () => {
-    //try to avoid rate limiting with the delay
     await createJournalEntries();
-    //await delay(10000);
 
-    //await archiveCompletedTodos();
-    //await delay(10000);
+    await archiveCompletedTodos();
 
     await runDynalistUpdates();
 
-    console.log("done");
+    console.log("total requests: " + totalRequests);
 })();
 
 
