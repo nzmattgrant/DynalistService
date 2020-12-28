@@ -45,7 +45,7 @@ const getPostResponse = async (url, json) => {
 }
 
 const createNewEntry = async (fileId, parentId, content, index = 0) => {
-    await getPostResponse('https://dynalist.io/api/v1/doc/edit',
+    return await getPostResponse('https://dynalist.io/api/v1/doc/edit',
         {
             token: config.dynalistApiKey,
             file_id: fileId,
@@ -259,6 +259,7 @@ const updateOldEntry = async (fileId, id, content) => {
 }
 const todayTag = "#today";
 const yesterdayTag = "#yesterday";
+const todayTodoListTag = "#todo-today"
 
 const padDateNumWithZeros = (numString) => numString.length === 1 ? ("0" + numString) : numString
 
@@ -420,17 +421,37 @@ const moveCheckedSubTrees = async (subTrees, parentId) => {
     console.log(result);
 }
 
-const archiveCompletedTodos = async () => {
-    const document = await getDocument(config.dynalistTodoListDocumentId);
-    const nodes = document.nodes;
-    const todayTodoEntry = nodes.find(item => item.id == config.dynalistTodoTodayId);
+const archiveTodoList = async (todayTodoEntry, nodes, toMoveToId) => {
     await preprocessSubTrees(todayTodoEntry, nodes);
     var subTrees = getSubTreesOrNull(todayTodoEntry, nodes);
     subTrees = subTrees && subTrees.children ? subTrees.children : [];
+    await moveCheckedSubTrees(subTrees, toMoveToId);
+}
+
+const generateWithinDocumentPath = (node, nodes, documentPath) => {
+    const parent = nodes.find(parent => parent.children && parent.children.includes(node.id));
+    if(parent){
+        documentPath = parent.content + " > " + documentPath;
+        return generateWithinDocumentPath(parent, nodes, documentPath);
+    }
+    return documentPath
+}
+
+const archiveCompletedTodos = async () => {
+    //all nodes and todo lists
+    const document = await getDocument(config.dynalistTodoListDocumentId);
+    const allNodes = document.nodes;
+    const todayTodayLists = allNodes.filter(node => node.content.includes(todayTodoListTag));
+    //journal entries
     const journalDocument = await getDocument(config.journalDocumentId);
     const journalNodes = journalDocument.nodes;
     const yesterdayJournalEntry = journalNodes.find(node => node.content.includes(yesterdayTag));
-    await moveCheckedSubTrees(subTrees, yesterdayJournalEntry.id);
+    for (var todayTodoList of todayTodayLists) { 
+        const newNodeContent = generateWithinDocumentPath(todayTodoList, allNodes, todayTodoList.content);
+        const newNodeResult = await createNewEntry(config.journalDocumentId, yesterdayJournalEntry.id, newNodeContent);
+        const newNodeId = newNodeResult.new_node_ids[0];
+        await archiveTodoList(todayTodoList, allNodes, newNodeId);
+    }  
 }
 
 (async () => {
