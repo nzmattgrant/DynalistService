@@ -257,6 +257,8 @@ const updateOldEntry = async (fileId, id, content) => {
         }
     );
 }
+const todayTag = "#today";
+const yesterdayTag = "#yesterday";
 
 const padDateNumWithZeros = (numString) => numString.length === 1 ? ("0" + numString) : numString
 
@@ -264,9 +266,13 @@ const createJournalEntries = async () => {
     const journalId = config.journalDocumentId;
     var journalDocument = await getDocument(journalId);
     console.log(journalDocument);
-    var lastEntry = journalDocument.nodes.find(node => node.content.includes("#latest"));
+    var lastEntry = journalDocument.nodes.find(node => node.content.includes(todayTag));
+    var previousEntry = journalDocument.nodes.find(node => node.content.includes(yesterdayTag));
     if (lastEntry == null) {
         throw Error("there is no latest element");
+    }
+    if (previousEntry == null) {
+        throw Error("there is no previous element");
     }
     var re = /!\((.*)\)/i;
     var currentDateString = lastEntry.content.match(re)[1];
@@ -281,14 +287,17 @@ const createJournalEntries = async () => {
         newDate = newDate.plusDays(1);
         //todo don't pass in the journal document, just the month and year
         const monthEntryId = await ensureCorrectMonthEntry(journalId, journalDocument, lastEntry.id, newDate);
-        const oldEntryContent = lastEntry.content.replace(" #latest", "");
-        await updateOldEntry(journalId, lastEntry.id, oldEntryContent)
+        const oldLastEntryContent = lastEntry.content.replace(todayTag, yesterdayTag);
+        await updateOldEntry(journalId, lastEntry.id, oldLastEntryContent);
+        const oldPreviousEntryContent = lastEntry.content.replace(" " + yesterdayTag, "");
+        await updateOldEntry(journalId, previousEntry.id, oldPreviousEntryContent);
         const month = padDateNumWithZeros(newDate.month().value().toString());
         const day = padDateNumWithZeros(newDate.dayOfMonth().toString());
-        const newEntryContent = `!(${newDate.year()}-${month}-${day}) #latest`
+        const newEntryContent = `!(${newDate.year()}-${month}-${day}) ${todayTag}`
         await createNewEntry(journalId, monthEntryId, newEntryContent)
         journalDocument = await getDocument(journalId);
-        lastEntry = journalDocument.nodes.find(node => node.content.includes("#latest"));
+        lastEntry = journalDocument.nodes.find(node => node.content.includes(todayTag));
+        previousEntry = journalDocument.nodes.find(node => node.content.includes(yesterdayTag));
     }
 }
 
@@ -420,8 +429,8 @@ const archiveCompletedTodos = async () => {
     subTrees = subTrees && subTrees.children ? subTrees.children : [];
     const journalDocument = await getDocument(config.journalDocumentId);
     const journalNodes = journalDocument.nodes;
-    const todayJournalEntry = journalNodes.find(node => node.content.includes("#latest"));
-    await moveCheckedSubTrees(subTrees, todayJournalEntry.id);
+    const yesterdayJournalEntry = journalNodes.find(node => node.content.includes(yesterdayTag));
+    await moveCheckedSubTrees(subTrees, yesterdayJournalEntry.id);
 }
 
 (async () => {
