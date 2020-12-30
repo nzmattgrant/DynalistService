@@ -290,7 +290,7 @@ const createJournalEntries = async () => {
         const monthEntryId = await ensureCorrectMonthEntry(journalId, journalDocument, lastEntry.id, newDate);
         const oldLastEntryContent = lastEntry.content.replace(todayTag, yesterdayTag);
         await updateOldEntry(journalId, lastEntry.id, oldLastEntryContent);
-        const oldPreviousEntryContent = lastEntry.content.replace(" " + yesterdayTag, "");
+        const oldPreviousEntryContent = previousEntry.content.replace(" " + yesterdayTag, "");
         await updateOldEntry(journalId, previousEntry.id, oldPreviousEntryContent);
         const month = padDateNumWithZeros(newDate.month().value().toString());
         const day = padDateNumWithZeros(newDate.dayOfMonth().toString());
