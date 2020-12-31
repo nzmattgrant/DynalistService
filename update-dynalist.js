@@ -2,8 +2,9 @@ const config = require('./config.json');
 const request = require('request');
 const path = require('path');
 const _ = require('lodash');
-const { LocalDate, ChronoUnit, Month, DateTimeFormatter } = require('js-joda');
+const { LocalDate, ChronoUnit, nativeJs } = require('js-joda');
 const moment = require("moment");
+const DateUtils = require('./date-utils');
 
 const delay = (ms) => {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -106,10 +107,12 @@ const runDynalistUpdates = async () => {
 
     var futureTodos = nodes.filter(n => futureTodosIds.includes(n.id));
 
-    const now = moment();
+    const today = moment().startOf('day');
     positionIndex = 0;
     _.forEach(futureTodos, node => {
-        if (now.diff(moment(node.modified), "days") > 7) {
+        const nodeDate = DateUtils.getDateFromDynalistNote(node.content);
+        if ((nodeDate && today >= nodeDate)
+             || today.diff(moment(node.modified), "days") > 7) {
             changes.push({
                 "action": "move",
                 "node_id": node.id,
@@ -275,9 +278,8 @@ const createJournalEntries = async () => {
     if (previousEntry == null) {
         throw Error("there is no previous element");
     }
-    var re = /!\((.*)\)/i;
-    var currentDateString = lastEntry.content.match(re)[1];
-    var newDate = LocalDate.parse(currentDateString);
+    //todo swithc over from js-joda to momentjs (moment is more convenient)
+    var newDate = LocalDate.from(nativeJs(DateUtils.getDateFromDynalistNote(lastEntry.content)));
     const today = LocalDate.now();
     const daysDifference = newDate.until(today, ChronoUnit.DAYS);
     var parentEntry = journalDocument.nodes.find(node => node.children && node.children.includes(lastEntry.id));
