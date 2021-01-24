@@ -5,26 +5,15 @@ const _ = require('lodash');
 const { LocalDate, ChronoUnit, nativeJs } = require('js-joda');
 const moment = require("moment");
 const DateUtils = require('./date-utils');
+const dailiesService = require('./dailies-service');
 
 const delay = (ms) => {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// var timeOfReset = null;
-// var requestsSinceReset = 0;
 var totalRequests = 0
 
 const getPostResponse = async (url, json) => {
-    // if(timeOfReset == null){
-    //     timeOfReset = moment();
-    // }
-    // else if (requestsSinceReset > 59 && moment().diff(moment(timeOfReset), "minutes") < 1){
-    //     requestsSinceReset = 0;
-    //     timeOfReset = moment();
-    //     await delay(60000);//wait another minute to avoid rate limiting
-    // }
-
-    // requestsSinceReset = requestsSinceReset + 1;
     await delay(1000);//rate limited on requests (one every second);
     totalRequests = totalRequests + 1;
 
@@ -304,6 +293,7 @@ const createJournalEntries = async () => {
     }
 }
 
+//todo move to dynalist service exclusively
 const getSubTreesOrNull = (item, nodes) => {
     const subTrees = [];
     if (item.children) {
@@ -413,8 +403,6 @@ const getCheckedItemDeleteChanges = (subTrees, okToDelete) => {
     return changes;
 }
 
-
-
 const moveCheckedSubTrees = async (subTrees, parentId) => {
     const copiedIds = await copyCheckedSubTrees(subTrees, parentId);
     const changes = getCheckedItemDeleteChanges(subTrees, copiedIds);
@@ -463,7 +451,9 @@ const archiveCompletedTodos = async () => {
 
     await runDynalistUpdates();
 
-    console.log("total requests: " + totalRequests);
+    await dailiesService.updateDailies();
+
+    //console.log("total requests: " + totalRequests);
 })();
 
 
