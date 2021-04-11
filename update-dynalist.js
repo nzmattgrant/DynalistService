@@ -6,6 +6,7 @@ const { LocalDate, ChronoUnit, nativeJs } = require('js-joda');
 const moment = require("moment");
 const DateUtils = require('./date-utils');
 const dailiesService = require('./dailies-service');
+const inventoryService = require('./inventory-service');
 
 const delay = (ms) => {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -138,7 +139,7 @@ const runDynalistUpdates = async () => {
             currentTodos = nodes.filter(n => node.children.includes(n.id)) || [];
         }
         if (node.id == config.dynalistTodoAllId) {
-            futureTodos = nodes.filter(n => node.children.includes(n.id)) || [];
+            futureTodos = nodes.filter(n => node.children && node.children.includes(n.id)) || [];
         }
     });
 
@@ -249,8 +250,8 @@ const updateOldEntry = async (fileId, id, content) => {
         }
     );
 }
-const todayTag = "#today";
-const yesterdayTag = "#yesterday";
+const todayTag = "#today-journal-entry";
+const yesterdayTag = "#yesterday-journal-entry";
 const todayTodoListTag = "#todo-today"
 
 const padDateNumWithZeros = (numString) => numString.length === 1 ? ("0" + numString) : numString
@@ -267,7 +268,7 @@ const createJournalEntries = async () => {
     if (previousEntry == null) {
         throw Error("there is no previous element");
     }
-    //todo swithc over from js-joda to momentjs (moment is more convenient)
+    //todo switch over from js-joda to momentjs (moment is more convenient)
     var newDate = LocalDate.from(nativeJs(DateUtils.getDateFromDynalistNote(lastEntry.content)));
     const today = LocalDate.now();
     const daysDifference = newDate.until(today, ChronoUnit.DAYS);
@@ -294,22 +295,23 @@ const createJournalEntries = async () => {
 }
 
 //todo move to dynalist service exclusively
-const getSubTreesOrNull = (item, nodes) => {
+const getSubTreesOrNull = (item, nodes, ancestorChecked = false) => {
     const subTrees = [];
+    const isItemChecked = item.checked || false;
     if (item.children) {
         const childrenItems = nodes.filter(node => item.children.includes(node.id))
         childrenItems.forEach(childItem => {
-            const childAsSubtrees = getSubTreesOrNull(childItem, nodes);
+            const childAsSubtrees = getSubTreesOrNull(childItem, nodes, isItemChecked || ancestorChecked);
             if (childAsSubtrees != null) {
                 subTrees.push(childAsSubtrees)
             }
         });
     }
-    if (item.checked || subTrees.length) {
+    if (isItemChecked || ancestorChecked || subTrees.length) {
         return {
             id: item.id,
             content: item.content,
-            checked: item.checked || false,
+            checked: isItemChecked,
             children: subTrees
         };
     }
@@ -418,11 +420,11 @@ const archiveTodoList = async (todayTodoEntry, nodes, toMoveToId) => {
     await moveCheckedSubTrees(subTrees, toMoveToId);
 }
 
-const generateWithinDocumentPath = (node, nodes, documentPath) => {
+const generatePathToNodeString = (node, nodes, documentPath) => {
     const parent = nodes.find(parent => parent.children && parent.children.includes(node.id));
     if(parent){
         documentPath = parent.content + " > " + documentPath;
-        return generateWithinDocumentPath(parent, nodes, documentPath);
+        return generatePathToNodeString(parent, nodes, documentPath);
     }
     return documentPath
 }
@@ -437,7 +439,7 @@ const archiveCompletedTodos = async () => {
     const journalNodes = journalDocument.nodes;
     const yesterdayJournalEntry = journalNodes.find(node => node.content.includes(yesterdayTag));
     for (var todayTodoList of todayTodayLists) { 
-        const newNodeContent = generateWithinDocumentPath(todayTodoList, allNodes, todayTodoList.content);
+        const newNodeContent = generatePathToNodeString(todayTodoList, allNodes, todayTodoList.content);
         const newNodeResult = await createNewEntry(config.journalDocumentId, yesterdayJournalEntry.id, newNodeContent);
         const newNodeId = newNodeResult.new_node_ids[0];
         await archiveTodoList(todayTodoList, allNodes, newNodeId);
@@ -445,13 +447,15 @@ const archiveCompletedTodos = async () => {
 }
 
 (async () => {
-    await createJournalEntries();
+    // await createJournalEntries();
 
-    await archiveCompletedTodos();
+    // await archiveCompletedTodos();
 
-    await runDynalistUpdates();
+    // await runDynalistUpdates();
 
-    await dailiesService.updateDailies();
+    // await dailiesService.updateDailies();
+
+    await inventoryService.updateInventory();
 
     //console.log("total requests: " + totalRequests);
 })();

@@ -118,6 +118,62 @@ const copySubTrees = async (subTrees, parentId, documentId, includeChecked) => {
     return copiedIds;
 }
 
+const moveNodes = async (nodes, parentId, documentId, includeChecked = true) => {
+    var changes = [];
+
+    var positionIndex = 0;
+    nodes.forEach(node => {
+
+        var change = {
+            "action": "move",
+            "node_id": node.id,
+            "parent_id": parentId,
+            "index": positionIndex
+        }
+        if(includeChecked){
+            change = { 
+                ...change, 
+                "checkbox": true,
+                "checked": node.checked || false,
+            };
+        }
+        changes.push(change);
+        positionIndex = positionIndex + 1;
+    });
+
+    await updateDocument(documentId, changes);
+}
+
+const moveNodeIds = async (nodeIds, parentId, documentId) => {
+    var changes = [];
+
+    var positionIndex = 0;
+    _.forEach(nodeIds, nodeId => {
+        console.log(nodeId);
+        changes.push({
+            "action": "move",
+            "node_id": nodeId,
+            "parent_id": parentId,
+            "index": positionIndex
+        });
+        positionIndex = positionIndex + 1;
+    });
+
+    await updateDocument(documentId, changes);
+}
+
+const uncheckNodes = async (nodes, documentId) => {
+    const changes = [];
+    nodes.forEach(node => {
+        changes.push({
+            "action": "edit",
+            "node_id": node.id,
+            "checked": false,
+        });
+    });
+    await updateDocument(documentId, changes);
+}
+
 const DynalistService = {
     getDocument: getDocument,
     updateDocument: updateDocument,
@@ -125,6 +181,8 @@ const DynalistService = {
     getSubTreesOrNull: getSubTreesOrNull,
     getNodeByHashTag: getNodeByHashTag,
     copySubtrees: copySubTrees,
+    moveNodes: moveNodes,
+    uncheckNodes: uncheckNodes
 }
 
 module.exports = DynalistService;
