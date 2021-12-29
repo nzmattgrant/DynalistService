@@ -7,47 +7,15 @@ const moment = require("moment");
 const DateUtils = require('./date-utils');
 const dailiesService = require('./dailies-service');
 const inventoryService = require('./inventory-service');
-
-const delay = (ms) => {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-var totalRequests = 0
-
-const getPostResponse = async (url, json) => {
-    await delay(1000);//rate limited on requests (one every second);
-    totalRequests = totalRequests + 1;
-
-    return new Promise((resolve, reject) => {
-        request.post(
-            {
-                url: url,
-                json: json
-            },
-            (error, res, body) => {
-                if (!error && res.statusCode == 200) {
-                    resolve(body);
-                } else {
-                    reject(error);
-                }
-            }
-        );
-    });
-}
+const DynalistService = require('./dynalist-service');
 
 const createNewEntry = async (fileId, parentId, content, index = 0) => {
-    return await getPostResponse('https://dynalist.io/api/v1/doc/edit',
-        {
-            token: config.dynalistApiKey,
-            file_id: fileId,
-            changes: [{
-                "action": "insert",
-                "parent_id": parentId,
-                "index": index,
-                "content": content
-            }]
-        }
-    );
+    return await DynalistService.updateDocument(fileId, [{
+        "action": "insert",
+        "parent_id": parentId,
+        "index": index,
+        "content": content
+    }]);
 }
 
 
@@ -59,14 +27,8 @@ const capitalizeFirstLetter = (s) => {
 
 const runDynalistUpdates = async () => {
 
-    var todoDocument = await getPostResponse('https://dynalist.io/api/v1/doc/read',
-        {
-            token: config.dynalistApiKey,
-            file_id: config.dynalistTodoListDocumentId
-        }
-    );
+    let todoDocument = await DynalistService.getDocument(config.dynalistTodoListDocumentId);
     var nodes = todoDocument.nodes;
-    //var currentTodosIds = [];
     var tomorrowTodosIds = [];
     var futureTodosIds = [];
     _.forEach(nodes, node => {
@@ -85,7 +47,6 @@ const runDynalistUpdates = async () => {
 
     var positionIndex = 0;
     _.forEach(tomorrowTodosIds, nodeId => {
-        console.log(nodeId);
         changes.push({
             "action": "move",
             "node_id": nodeId,
@@ -113,24 +74,14 @@ const runDynalistUpdates = async () => {
         }
     });
 
-    await getPostResponse('https://dynalist.io/api/v1/doc/edit',
-        {
-            token: config.dynalistApiKey,
-            file_id: config.dynalistTodoListDocumentId,
-            changes: changes
-        }
-    );
+    await DynalistService.updateDocument(config.dynalistTodoListDocumentId, changes);
 
     //todo split these out into diffent files
     changes = [];
 
     //todo split this into a function
-    todoDocument = await getPostResponse('https://dynalist.io/api/v1/doc/read',
-        {
-            token: config.dynalistApiKey,
-            file_id: config.dynalistTodoListDocumentId
-        }
-    );
+    todoDocument = await DynalistService.getDocument(config.dynalistTodoListDocumentId); 
+
     nodes = todoDocument.nodes;
     var currentTodos = [];
     var futureTodos = [];
@@ -169,13 +120,8 @@ const runDynalistUpdates = async () => {
         positionIndex = positionIndex + 1;
     });
 
-    await getPostResponse('https://dynalist.io/api/v1/doc/edit',
-        {
-            token: config.dynalistApiKey,
-            file_id: config.dynalistTodoListDocumentId,
-            changes: changes
-        }
-    );
+    await DynalistService.updateDocument(config.dynalistTodoListDocumentId, changes);
+
 };
 
 const ensureCorrectYearEntry = async (journalId, journalDocument, monthEntryId, newDate) => {
@@ -185,18 +131,12 @@ const ensureCorrectYearEntry = async (journalId, journalDocument, monthEntryId, 
     if (newDateYear !== yearEntry.content) {
         //todo do it the stupid polling way and then update it to do it more efficiently in less api calls
         const yearParentEntryId = journalDocument.nodes.find(node => node.children && node.children.includes(yearEntry.id)).id;
-        const yearUpdateResult = await getPostResponse('https://dynalist.io/api/v1/doc/edit',
-            {
-                token: config.dynalistApiKey,
-                file_id: journalId,
-                changes: [{
-                    "action": "insert",
-                    "parent_id": yearParentEntryId,
-                    "index": 0,
-                    "content": newDateYear
-                }]
-            }
-        );
+        const yearUpdateResult = await DynalistService.updateDocument(journalId, [{
+            "action": "insert",
+            "parent_id": yearParentEntryId,
+            "index": 0,
+            "content": newDateYear
+        }]);
         yearEntryId = yearUpdateResult.new_node_ids[0];
     }
     return yearEntryId;
@@ -209,47 +149,28 @@ const ensureCorrectMonthEntry = async (journalId, journalDocument, lastEntryId, 
     const yearEntryId = await ensureCorrectYearEntry(journalId, journalDocument, monthEntryId, newDate);
     const newDateMonthName = capitalizeFirstLetter(newDate.month().name());
     if (newDateMonthName !== monthEntry.content) {
-        const monthUpdateResult = await getPostResponse('https://dynalist.io/api/v1/doc/edit',
-            {
-                token: config.dynalistApiKey,
-                file_id: journalId,
-                changes: [{
-                    "action": "insert",
-                    "parent_id": yearEntryId,
-                    "index": 0,
-                    "content": newDateMonthName
-                }]
-            }
+        const monthUpdateResult = await DynalistService.updateDocument(journalId, 
+            [{
+                "action": "insert",
+                "parent_id": yearEntryId,
+                "index": 0,
+                "content": newDateMonthName
+            }]
         );
         monthEntryId = monthUpdateResult.new_node_ids[0];
     }
     return monthEntryId;
 }
 
-const getDocument = async (id) => {
-    const document = await getPostResponse('https://dynalist.io/api/v1/doc/read',
-        {
-            token: config.dynalistApiKey,
-            file_id: id
-        });
-    return document;
-}
-
-
 
 const updateOldEntry = async (fileId, id, content) => {
-    await getPostResponse('https://dynalist.io/api/v1/doc/edit',
-        {
-            token: config.dynalistApiKey,
-            file_id: fileId,
-            changes: [{
-                "action": "edit",
-                "node_id": id,
-                "content": content
-            }]
-        }
-    );
+    await DynalistService.updateDocument(fileId, [{
+        "action": "edit",
+        "node_id": id,
+        "content": content
+    }]);
 }
+
 const todayTag = "#today-journal-entry";
 const yesterdayTag = "#yesterday-journal-entry";
 const todayTodoListTag = "#todo-today"
@@ -258,7 +179,7 @@ const padDateNumWithZeros = (numString) => numString.length === 1 ? ("0" + numSt
 
 const createJournalEntries = async () => {
     const journalId = config.journalDocumentId;
-    var journalDocument = await getDocument(journalId);
+    var journalDocument = await DynalistService.getDocument(journalId);
     console.log(journalDocument);
     var lastEntry = journalDocument.nodes.find(node => node.content.includes(todayTag));
     var previousEntry = journalDocument.nodes.find(node => node.content.includes(yesterdayTag));
@@ -288,34 +209,10 @@ const createJournalEntries = async () => {
         const day = padDateNumWithZeros(newDate.dayOfMonth().toString());
         const newEntryContent = `!(${newDate.year()}-${month}-${day}) ${todayTag}`
         await createNewEntry(journalId, monthEntryId, newEntryContent)
-        journalDocument = await getDocument(journalId);
+        journalDocument = await DynalistService.getDocument(journalId);
         lastEntry = journalDocument.nodes.find(node => node.content.includes(todayTag));
         previousEntry = journalDocument.nodes.find(node => node.content.includes(yesterdayTag));
     }
-}
-
-//todo move to dynalist service exclusively
-const getSubTreesOrNull = (item, nodes, ancestorChecked = false) => {
-    const subTrees = [];
-    const isItemChecked = item.checked || false;
-    if (item.children) {
-        const childrenItems = nodes.filter(node => item.children.includes(node.id))
-        childrenItems.forEach(childItem => {
-            const childAsSubtrees = getSubTreesOrNull(childItem, nodes, isItemChecked || ancestorChecked);
-            if (childAsSubtrees != null) {
-                subTrees.push(childAsSubtrees)
-            }
-        });
-    }
-    if (isItemChecked || ancestorChecked || subTrees.length) {
-        return {
-            id: item.id,
-            content: item.content,
-            checked: isItemChecked,
-            children: subTrees
-        };
-    }
-    return null;
 }
 
 const getPreprocessChanges = async (item, nodes, parentChecked = false) => {
@@ -338,19 +235,10 @@ const getPreprocessChanges = async (item, nodes, parentChecked = false) => {
     return changes;
 }
 
-const updateDocument = async (documentId, changes) => {
-    return await getPostResponse('https://dynalist.io/api/v1/doc/edit',
-        {
-            token: config.dynalistApiKey,
-            file_id: documentId,
-            changes: changes
-        });
-}
-
 const preprocessSubTrees = async (item, nodes) => {
     const changes = await getPreprocessChanges(item, nodes);
     if (changes.length) {
-        await updateDocument(config.dynalistTodoListDocumentId, changes);
+        await DynalistService.updateDocument(config.dynalistTodoListDocumentId, changes);
         console.log("here");
     }
 }
@@ -376,7 +264,7 @@ const copyCheckedSubTrees = async (subTrees, parentId) => {
             console.log(item);
         }
     });
-    var result = await updateDocument(config.journalDocumentId, changes);
+    var result = await DynalistService.updateDocument(config.journalDocumentId, changes);
     //await delay(1000);
     var newIds = result.new_node_ids || [];
     //Assumption is that everything is in the same order as what they were passed in as
@@ -409,13 +297,13 @@ const moveCheckedSubTrees = async (subTrees, parentId) => {
     const copiedIds = await copyCheckedSubTrees(subTrees, parentId);
     const changes = getCheckedItemDeleteChanges(subTrees, copiedIds);
     console.log(count);
-    const result = await updateDocument(config.dynalistTodoListDocumentId, changes);
+    const result = await DynalistService.updateDocument(config.dynalistTodoListDocumentId, changes);
     console.log(result);
 }
 
 const archiveTodoList = async (todayTodoEntry, nodes, toMoveToId) => {
     await preprocessSubTrees(todayTodoEntry, nodes);
-    var subTrees = getSubTreesOrNull(todayTodoEntry, nodes);
+    var subTrees = DynalistService.getCheckedItemsSubTreesOrNull(todayTodoEntry, nodes);
     subTrees = subTrees && subTrees.children ? subTrees.children : [];
     await moveCheckedSubTrees(subTrees, toMoveToId);
 }
@@ -431,11 +319,11 @@ const generatePathToNodeString = (node, nodes, documentPath) => {
 
 const archiveCompletedTodos = async () => {
     //all nodes and todo lists
-    const document = await getDocument(config.dynalistTodoListDocumentId);
+    const document = await DynalistService.getDocument(config.dynalistTodoListDocumentId);
     const allNodes = document.nodes;
     const todayTodayLists = allNodes.filter(node => node.content.includes(todayTodoListTag));
     //journal entries
-    const journalDocument = await getDocument(config.journalDocumentId);
+    const journalDocument = await DynalistService.getDocument(config.journalDocumentId);
     const journalNodes = journalDocument.nodes;
     const yesterdayJournalEntry = journalNodes.find(node => node.content.includes(yesterdayTag));
     for (var todayTodoList of todayTodayLists) { 
@@ -445,19 +333,16 @@ const archiveCompletedTodos = async () => {
         await archiveTodoList(todayTodoList, allNodes, newNodeId);
     }  
 }
-
 (async () => {
-    // await createJournalEntries();
+    await createJournalEntries();
 
-    // await archiveCompletedTodos();
+    await archiveCompletedTodos();
 
-    // await runDynalistUpdates();
+    await runDynalistUpdates();
 
-    // await dailiesService.updateDailies();
+    await dailiesService.updateDailies();
 
     await inventoryService.updateInventory();
-
-    //console.log("total requests: " + totalRequests);
 })();
 
 

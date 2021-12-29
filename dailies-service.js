@@ -30,7 +30,7 @@ const createNewDailyList = async () => {
     const templateNode = nodes.find(node => node.content.includes(templateHashTag));
     const dailiesNode = nodes.find(node => node.content.includes(dailyListHashTag));
     const subtrees = dynalistService.getSubTreesOrNull(templateNode, nodes);
-    await dynalistService.copySubtrees(subtrees.children, dailiesNode.id, documentId, true);
+    await dynalistService.copySubTrees(subtrees.children, dailiesNode.id, documentId, true);
 };
 
 const updateDailies = async () => {

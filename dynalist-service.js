@@ -43,7 +43,7 @@ const getDocument = async (id) => {
     return document;
 }
 
-const getSubTreesOrNull = (item, nodes, toIncludeCheck = _ => true) => {
+const getSubTreesOrNull = (item, nodes, includeItemTest = _ => true) => {
     const subTrees = [];
     if (item.children) {
         const childrenItems = nodes.filter(node => item.children.includes(node.id))
@@ -54,11 +54,34 @@ const getSubTreesOrNull = (item, nodes, toIncludeCheck = _ => true) => {
             }
         });
     }
-    if (toIncludeCheck(item) || subTrees.length) {
+    if (includeItemTest(item) || subTrees.length) {
         return {
             id: item.id,
             content: item.content,
             checked: item.checked || false,
+            children: subTrees
+        };
+    }
+    return null;
+}
+
+const getCheckedItemsSubTreesOrNull = (item, nodes, ancestorChecked = false) => {
+    const subTrees = [];
+    const isItemChecked = item.checked || false;
+    if (item.children) {
+        const childrenItems = nodes.filter(node => item.children.includes(node.id))
+        childrenItems.forEach(childItem => {
+            const childAsSubtrees = getCheckedItemsSubTreesOrNull(childItem, nodes, isItemChecked || ancestorChecked);
+            if (childAsSubtrees != null) {
+                subTrees.push(childAsSubtrees)
+            }
+        });
+    }
+    if (isItemChecked || ancestorChecked || subTrees.length) {
+        return {
+            id: item.id,
+            content: item.content,
+            checked: isItemChecked,
             children: subTrees
         };
     }
@@ -175,14 +198,15 @@ const uncheckNodes = async (nodes, documentId) => {
 }
 
 const DynalistService = {
-    getDocument: getDocument,
-    updateDocument: updateDocument,
-    deleteNodes: deleteNodes,
-    getSubTreesOrNull: getSubTreesOrNull,
-    getNodeByHashTag: getNodeByHashTag,
-    copySubtrees: copySubTrees,
-    moveNodes: moveNodes,
-    uncheckNodes: uncheckNodes
+    getDocument,
+    updateDocument,
+    deleteNodes,
+    getSubTreesOrNull,
+    getCheckedItemsSubTreesOrNull,
+    getNodeByHashTag,
+    copySubTrees,
+    moveNodes,
+    uncheckNodes
 }
 
 module.exports = DynalistService;
