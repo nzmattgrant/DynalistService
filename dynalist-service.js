@@ -197,6 +197,15 @@ const uncheckNodes = async (nodes, documentId) => {
     await updateDocument(documentId, changes);
 }
 
+const createNewEntry = async (fileId, parentId, content, index = 0) => {
+    return await DynalistService.updateDocument(fileId, [{
+        "action": "insert",
+        "parent_id": parentId,
+        "index": index,
+        "content": content
+    }]);
+}
+
 const DynalistService = {
     getDocument,
     updateDocument,
@@ -206,7 +215,8 @@ const DynalistService = {
     getNodeByHashTag,
     copySubTrees,
     moveNodes,
-    uncheckNodes
+    uncheckNodes,
+    createNewEntry
 }
 
 module.exports = DynalistService;
