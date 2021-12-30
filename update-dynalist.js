@@ -7,6 +7,7 @@ const dailiesService = require('./dailies-service');
 const inventoryService = require('./inventory-service');
 const DynalistService = require('./dynalist-service');
 const journalService = require('./dist/journal-service');
+const flashcardService = require('./dist/flashcard-service');
 
 const runDynalistUpdates = async () => {
 
@@ -227,6 +228,8 @@ const archiveCompletedTodos = async () => {
     }  
 }
 (async () => {
+    await flashcardService.updateFlashcardNotes();
+    
     await journalService.createJournalEntries();
 
     await archiveCompletedTodos();

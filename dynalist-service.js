@@ -141,7 +141,43 @@ const copySubTrees = async (subTrees, parentId, documentId, includeChecked) => {
     return copiedIds;
 }
 
-const moveNodes = async (nodes, parentId, documentId, includeChecked = true) => {
+const moveNodesToDifferentDocument = async (nodes, sourceDocumentId, destinationDocumentId, toMoveUnderNodeId = 'root', includeChecked = true) => {
+    const insertChanges = [];
+    const deleteChanges = [];
+    var positionIndex = 0;
+    console.log(destinationDocumentId);
+    nodes.forEach(node => {
+        let insertChange = {
+            "action": "insert",
+            "parent_id": toMoveUnderNodeId || 'root',
+            "index": positionIndex,
+            "content": node.content,
+            "note": node.note,
+            "heading": node.heading,
+            "color": node.color
+        }
+        if(includeChecked){
+            insertChange = { 
+                ...insertChange, 
+                "checkbox": true,
+                "checked": node.checked || false,
+            };
+        }
+        insertChanges.push(insertChange);
+        const deleteChange = {
+            "action": "delete",
+            "node_id": node.id
+        }
+        deleteChanges.push(deleteChange);
+        positionIndex = positionIndex + 1;
+    });
+    const insertResult = await updateDocument(destinationDocumentId, insertChanges);
+    const deleteResult = await updateDocument(sourceDocumentId, deleteChanges);
+    return [insertResult, deleteResult];
+}
+
+const moveNodes = async (nodes, sourceDocumentId, toMoveUnderNodeId, includeChecked = true) => {
+
     var changes = [];
 
     var positionIndex = 0;
@@ -150,7 +186,7 @@ const moveNodes = async (nodes, parentId, documentId, includeChecked = true) => 
         var change = {
             "action": "move",
             "node_id": node.id,
-            "parent_id": parentId,
+            "parent_id": toMoveUnderNodeId,
             "index": positionIndex
         }
         if(includeChecked){
@@ -163,8 +199,9 @@ const moveNodes = async (nodes, parentId, documentId, includeChecked = true) => 
         changes.push(change);
         positionIndex = positionIndex + 1;
     });
+    console.log(changes);
 
-    await updateDocument(documentId, changes);
+    await updateDocument(sourceDocumentId, changes);
 }
 
 const moveNodeIds = async (nodeIds, parentId, documentId) => {
@@ -206,6 +243,10 @@ const createNewEntry = async (fileId, parentId, content, index = 0) => {
     }]);
 }
 
+const filterNodesByContent = (document, filterString) => {
+    return document.nodes.filter(n => n.content.includes(filterString));
+}
+
 const DynalistService = {
     getDocument,
     updateDocument,
@@ -215,8 +256,10 @@ const DynalistService = {
     getNodeByHashTag,
     copySubTrees,
     moveNodes,
+    moveNodesToDifferentDocument,
     uncheckNodes,
-    createNewEntry
+    createNewEntry,
+    filterNodesByContent
 }
 
 module.exports = DynalistService;
