@@ -20,8 +20,8 @@ const createFlashcards = async (nodes) => {
                 "deckName": "Life Lessons",
                 "modelName": "Basic",
                 "fields": {
-                    "Front": splitContent[0],
-                    "Back": splitContent[1]
+                    "Front": splitContent[0].trim(),
+                    "Back": splitContent[1].trim()
                 },
                 "options": {
                     "allowDuplicate": true
