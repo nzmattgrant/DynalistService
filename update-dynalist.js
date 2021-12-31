@@ -227,12 +227,30 @@ const archiveCompletedTodos = async () => {
         await archiveTodoList(todayTodoList, allNodes, newNodeId);
     }  
 }
+
+const addJournalEntriesToJournal = async () => {
+    const todoDocument = await DynalistService.getDocument(config.dynalistTodoListDocumentId);
+    const journalDocument = await DynalistService.getDocument(config.journalDocumentId);
+    const nodes = await DynalistService.filterNodesByContent(todoDocument, config.journalEntryTag);
+    const yesterdayNodes = await DynalistService.filterNodesByContent(journalDocument, config.yesterdayTag);
+    const yesterdayNode = yesterdayNodes.length > 0 ? yesterdayNodes[0] : null;
+    if(!yesterdayNode){
+        return;
+    }
+    nodes.forEach(n => n.content = (n.content ?? '').replace(config.journalEntryTag, ''));
+    console.log(nodes);
+    await DynalistService.moveNodesToDifferentDocument(nodes, config.dynalistTodoListDocumentId, config.journalDocumentId, yesterdayNode.id)
+}
+
 (async () => {
+
     await flashcardService.updateFlashcardNotes();
     
     await journalService.createJournalEntries();
 
     await archiveCompletedTodos();
+
+    await addJournalEntriesToJournal();
 
     await runDynalistUpdates();
 
