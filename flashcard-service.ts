@@ -52,12 +52,16 @@ const checkOffConvertedFlashCards = async (nodes) => {
     await DynalistService.updateDocument(config.dynalistFlashcardsDocumentId, changes);
 }
 
+export const runAnkiUpdates = async () => {
+    const flashcardDocument = await DynalistService.getDocument(config.dynalistFlashcardsDocumentId);
+    const flashcardNodes = flashcardDocument.nodes.filter(n => !n.checked);
+    await createFlashcards(flashcardNodes);
+    await checkOffConvertedFlashCards(flashcardNodes);
+}
+
 export const updateFlashcardNotes = async () => {
     const todoToday = await DynalistService.getDocument(config.dynalistTodoListDocumentId);//todo get subtree
     const filteredItems = DynalistService.filterNodesByContent(todoToday, config.flashcardsTag);
     await DynalistService.moveNodesToDifferentDocument(filteredItems, config.dynalistTodoListDocumentId, config.dynalistFlashcardsDocumentId);
-    const flashcardDocument = await DynalistService.getDocument(config.dynalistFlashcardsDocumentId);
-    const flashcardNodes = flashcardDocument.nodes.filter(n => !n.checked);
-    const result = await createFlashcards(flashcardNodes);
-    await checkOffConvertedFlashCards(flashcardNodes);
+    await runAnkiUpdates();
 }

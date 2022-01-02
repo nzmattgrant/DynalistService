@@ -243,6 +243,11 @@ const addJournalEntriesToJournal = async () => {
 }
 
 (async () => {
+    const runManualOnly = process.argv.includes("--run-manual-only-tasks");
+    if(runManualOnly){
+        flashcardService.runAnkiUpdates();
+        return;
+    }
 
     await flashcardService.updateFlashcardNotes();
     
