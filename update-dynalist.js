@@ -237,7 +237,7 @@ const addJournalEntriesToJournal = async () => {
     if(!yesterdayNode){
         return;
     }
-    nodes.forEach(n => n.content = (n.content ?? '').replace(config.journalEntryTag, ''));
+    nodes.forEach(n => n.content = (n.content || '').replace(config.journalEntryTag, ''));
     console.log(nodes);
     await DynalistService.moveNodesToDifferentDocument(nodes, config.dynalistTodoListDocumentId, config.journalDocumentId, yesterdayNode.id)
 }
