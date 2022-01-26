@@ -8,6 +8,7 @@ const inventoryService = require('./inventory-service');
 const DynalistService = require('./dynalist-service');
 const journalService = require('./dist/journal-service');
 const flashcardService = require('./dist/flashcard-service');
+const { DynalistApi } = require('dynalist-api');
 
 const runDynalistUpdates = async () => {
 
@@ -243,6 +244,10 @@ const addJournalEntriesToJournal = async () => {
 }
 
 (async () => {
+    const api = new DynalistApi(config.dynalistApiKey);
+
+    console.log(await api.getDocument(config.dynalistSharedDocumentId));
+
     const runManualOnly = process.argv.includes("--run-manual-only-tasks");
     if(runManualOnly){
         flashcardService.runAnkiUpdates();

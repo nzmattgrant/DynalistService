@@ -2,6 +2,9 @@ import * as DateUtils from './date-utils';
 import * as config from './config.json';
 import * as DynalistService from './dynalist-service';
 import { LocalDate, ChronoUnit, nativeJs } from 'js-joda';
+import {DynalistApi} from 'dynalist-api';
+
+const api = new DynalistApi(config.dynalistApiKey);
 
 const testfunc = () => {
     console.log("testy test");
@@ -16,7 +19,7 @@ const capitalizeFirstLetter = (s) => {
 }
 
 const updateOldEntry = async (fileId: string, id: any, content: any) => {
-    await DynalistService.updateDocument(fileId, [{
+    await api.updateDocument(fileId, [{
         "action": "edit",
         "node_id": id,
         "content": content

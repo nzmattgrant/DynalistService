@@ -33,9 +33,11 @@ const createFlashcards = async (nodes) => {
         };
         try{
             await invoke("addNote", 6, params);
+            return true;
         }
         catch (error) {
             console.error(error);
+            return false;
         }
     }
 }
@@ -55,8 +57,10 @@ const checkOffConvertedFlashCards = async (nodes) => {
 export const runAnkiUpdates = async () => {
     const flashcardDocument = await DynalistService.getDocument(config.dynalistFlashcardsDocumentId);
     const flashcardNodes = flashcardDocument.nodes.filter(n => !n.checked);
-    await createFlashcards(flashcardNodes);
-    await checkOffConvertedFlashCards(flashcardNodes);
+    const success = await createFlashcards(flashcardNodes);
+    if(success){
+        await checkOffConvertedFlashCards(flashcardNodes);
+    }
 }
 
 export const updateFlashcardNotes = async () => {
