@@ -9,6 +9,7 @@ const invoke = async (action, version, params={}) => {
 
 const createFlashcards = async (nodes) => {
     console.log(nodes);
+    let returnValue = true;
     for(const node of nodes){
         const splitContent = (node.content ?? '').replace(config.flashcardsTag, '')
         .replace('=>', '->').split('->');
@@ -31,15 +32,19 @@ const createFlashcards = async (nodes) => {
                 ],
             }
         };
+        
+        const errorFunction = (error) => {
+            console.error(error);
+            returnValue = false;
+        }
         try{
-            await invoke("addNote", 6, params);
-            return true;
+            await invoke("addNote", 6, params).catch(errorFunction);
         }
         catch (error) {
-            console.error(error);
-            return false;
+            errorFunction(error);
         }
     }
+    return returnValue;
 }
 
 const checkOffConvertedFlashCards = async (nodes) => {
