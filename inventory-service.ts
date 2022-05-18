@@ -1,5 +1,7 @@
-const dynalistService = require('./dynalist-service');
-const config = require('./config.json');
+import dynalistService = require('./dynalist-service');
+import * as config from './config.json';
+import {DynalistApi} from 'dynalist-api';
+const api = new DynalistApi(config.dynalistApiKey);
 
 const inventoryHashTag = "#inventory";
 const shoppingListHashTag = "#shopping-list";
@@ -21,8 +23,8 @@ const  moveCheckedShoppingListItemsToInventory = async () => {
         shoppingNodeGrandchildrenIds = shoppingNodeGrandchildrenIds.concat(child.children);
     });
     const checkedGrandchildren = nodes.filter(node => node.checked && shoppingNodeGrandchildrenIds.includes(node.id));
-    await dynalistService.uncheckNodes(checkedGrandchildren, documentId);
-    await dynalistService.moveNodes(checkedGrandchildren, inventoryUncategorizedNode.id, documentId);
+    await api.uncheckNodes(checkedGrandchildren, documentId);
+    await api.moveNodes(checkedGrandchildren, documentId, inventoryUncategorizedNode.id);
 };
 
 const moveCheckedInventoryItemsToShoppingList = async () => {
@@ -41,18 +43,12 @@ const moveCheckedInventoryItemsToShoppingList = async () => {
     const checkedGrandchildren = nodes.filter(node => node.checked && inventoryNodeGrandchildrenIds.includes(node.id));
     const restockItems = checkedGrandchildren.filter(node => node.content.includes(restockHashTag));
     const deleteItems = checkedGrandchildren.filter(node => !node.content.includes(restockHashTag));
-    await dynalistService.uncheckNodes(restockItems, documentId);
-    await dynalistService.moveNodes(restockItems, shoppingUncategorizedNode.id, documentId);
-    await dynalistService.deleteNodes(documentId, deleteItems);//todo consistent ordering
+    await api.uncheckNodes(restockItems, documentId);
+    await api.moveNodes(restockItems, documentId, shoppingUncategorizedNode.id);
+    await api.deleteNodes(documentId, deleteItems);//todo consistent ordering
 };
 
-const updateInventory = async () => {
+export const updateInventory = async () => {
     await moveCheckedShoppingListItemsToInventory();
     await moveCheckedInventoryItemsToShoppingList();
 }
-
-const InventoryService = {
-    updateInventory: updateInventory,
-}
-
-module.exports = InventoryService
