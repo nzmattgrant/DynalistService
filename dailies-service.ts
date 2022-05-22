@@ -1,12 +1,12 @@
-const dynalistService = require('./dynalist-service');
-const config = require('./config.json');
+import * as dynalistService from './dynalist-service';
+import * as config from './config.json';
 
 const templateHashTag = "#daily-template";
 const dailyListHashTag = "#today-daily";
 
 
 //precondition: all checked dailies have already been deleted
-const  deleteOldDailyList = async () => {
+const deleteOldDailyList = async () => {
     //TODO!! build and intermediate tree so that it's a lot easier to update things and you are not holding too much stuff in memory
     //It will make things a lot more modular as well and it would be nice to be able to switch out the backend also
     const documentId = config.dynalistTodoListDocumentId;
@@ -33,13 +33,7 @@ const createNewDailyList = async () => {
     await dynalistService.copySubTrees(subtrees.children, dailiesNode.id, documentId, true);
 };
 
-const updateDailies = async () => {
+export const updateDailies = async () => {
     await deleteOldDailyList();
     await createNewDailyList();
 }
-
-const DailiesService = {
-    updateDailies: updateDailies,
-}
-
-module.exports = DailiesService

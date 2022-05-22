@@ -3,9 +3,10 @@ const _ = require('lodash');
 const { LocalDate, ChronoUnit, nativeJs } = require('js-joda');
 const moment = require("moment");
 const DateUtils = require('./date-utils');
-const dailiesService = require('./dailies-service');
+const dailiesService = require('./dist/dailies-service');
+const todoService = require('./dist/todo-service');
 const inventoryService = require('./dist/inventory-service');
-const DynalistService = require('./dynalist-service');
+const DynalistService = require('./dist/dynalist-service');
 const journalService = require('./dist/journal-service');
 const flashcardService = require('./dist/flashcard-service');
 const { DynalistApi } = require('dynalist-api');
@@ -248,10 +249,11 @@ const addJournalEntriesToJournal = async () => {
 
     console.log(await api.getDocument(config.dynalistSharedDocumentId));
 
-    const runManualOnly = process.argv.includes("--run-manual-only-tasks");
+    const runManualOnly = true;//process.argv.includes("--run-manual-only-tasks");
     if(runManualOnly){
+        await todoService.moveWeekendTasks();
         //await flashcardService.updateFlashcardNotes();
-        await flashcardService.runAnkiUpdates();
+        //await flashcardService.runAnkiUpdates();
         return;
     }
 
