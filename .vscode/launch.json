@@ -11,8 +11,7 @@
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}\\update-dynalist.js",
-            "args": ["--run-manual-only-tasks"]
+            "program": "${workspaceFolder}/update-dynalist.js",
         }
     ]
 }
