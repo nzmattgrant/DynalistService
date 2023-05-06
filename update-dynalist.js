@@ -251,9 +251,9 @@ const addJournalEntriesToJournal = async () => {
 
     const runManualOnly = true;//process.argv.includes("--run-manual-only-tasks");
     if(runManualOnly){
-        await todoService.moveWeekendTasks();
-        //await flashcardService.updateFlashcardNotes();
-        //await flashcardService.runAnkiUpdates();
+        //await todoService.moveWeekendTasks();
+        await flashcardService.updateFlashcardNotes();
+        await flashcardService.runAnkiUpdates();
         return;
     }
 

@@ -6,6 +6,8 @@
   "dependencies": {
     "axios": "^0.24.0",
     "dynalist-api": "^1.0.3",
+    "googleapis": "^109.0.1",
+    "googlephotos": "^0.3.5",
     "js-joda": "^1.11.0",
     "js-joda-locale": "^1.1.0-pre6",
     "js-joda-timezone": "^2.1.1",

@@ -17,14 +17,20 @@ export const moveWeeklyTasks = async () => {
     }
     const documentId = config.dynalistTodoListDocumentId;
     const document = await api.getDocument(documentId) as any;
-    const nodes = document.nodes;
-    const weeklyNode = nodes.find(node => node.content.includes(weeklyTasksHashtag));
-    const todayNode = nodes.find(node => node.content.includes(todayTasksHashTag));
-    const subtrees = api.getSubTreesOrNull(weeklyNode, nodes);
-    if(subtrees){
-        await api.copySubTrees(subtrees.children, todayNode.id, documentId, true);
-        await api.deleteNodes(documentId, subtrees.children || []);
-    }
+
+    //old
+    // const nodes = document.nodes;
+    // const weeklyNode = nodes.find(node => node.content.includes(weeklyTasksHashtag));
+    // const todayNode = nodes.find(node => node.content.includes(todayTasksHashTag));
+    // const subtrees = api.getSubTreesOrNull(weeklyNode, nodes);
+    // if(subtrees){
+    //     await api.copySubTrees(subtrees.children, todayNode.id, documentId, true);
+    //     await api.deleteNodes(documentId, subtrees.children || []);
+    // }
+    //new
+    const weeklyNode = document.getNodeByQuery(node => node.content.includes(weeklyTasksHashtag));
+    const todayNode = document.getNodeByQuery(node => node.content.includes(todayTasksHashTag));
+    weeklyNode.moveChildrenTo(todayNode);
 }
 
 export const moveWeekendTasks = async () => {
@@ -36,12 +42,18 @@ export const moveWeekendTasks = async () => {
     }
     const documentId = config.dynalistTodoListDocumentId;
     const document = await api.getDocument(documentId) as any;
-    const nodes = document.nodes;
-    const weekendNode = nodes.find(node => node.content.includes(weekendTasksHashtag));
-    const todayNode = nodes.find(node => node.content.includes(todayTasksHashTag));
-    const subtrees = api.getSubTreesOrNull(weekendNode, nodes);
-    if(subtrees){
-        await api.copySubTrees(subtrees.children, todayNode.id, documentId, true);
-        await api.deleteNodes(documentId, subtrees.children || []);
-    }
+
+    //old
+    // const nodes = document.nodes;
+    // const weekendNode = nodes.find(node => node.content.includes(weekendTasksHashtag));
+    // const todayNode = nodes.find(node => node.content.includes(todayTasksHashTag));
+    // const subtrees = api.getSubTreesOrNull(weekendNode, nodes);
+    // if(subtrees){
+    //     await api.copySubTrees(subtrees.children, todayNode.id, documentId, true);
+    //     await api.deleteNodes(documentId, subtrees.children || []);
+    // }
+    //new
+    const weekendNode = document.getNodeByQuery(node => node.content.includes(weekendTasksHashtag));
+    const todayNode = document.getNodeByQuery(node => node.content.includes(todayTasksHashTag));
+    weekendNode.moveChildrenTo(todayNode);
 }
