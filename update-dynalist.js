@@ -10,6 +10,7 @@ const DynalistService = require('./dist/dynalist-service');
 const journalService = require('./dist/journal-service');
 const flashcardService = require('./dist/flashcard-service');
 const { DynalistApi } = require('dynalist-api');
+const mail = require('./dist/mailer');
 
 const runDynalistUpdates = async () => {
 
@@ -49,7 +50,7 @@ const runDynalistUpdates = async () => {
     _.forEach(futureTodos, node => {
         const nodeDate = DateUtils.getDateFromDynalistNote(node.content);
         if ((nodeDate && today >= nodeDate)
-             || today.diff(moment(node.modified), "days") > 7) {
+            || today.diff(moment(node.modified), "days") > 7) {
             changes.push({
                 "action": "move",
                 "node_id": node.id,
@@ -66,7 +67,7 @@ const runDynalistUpdates = async () => {
     changes = [];
 
     //todo split this into a function
-    todoDocument = await DynalistService.getDocument(config.dynalistTodoListDocumentId); 
+    todoDocument = await DynalistService.getDocument(config.dynalistTodoListDocumentId);
 
     nodes = todoDocument.nodes;
     var currentTodos = [];
@@ -156,7 +157,7 @@ const copyCheckedSubTrees = async (subTrees, parentId) => {
             "content": item.content
         });
         copiedIds.push(item.id);
-        if(item.id === undefined){
+        if (item.id === undefined) {
             console.log(item);
         }
     });
@@ -206,7 +207,7 @@ const archiveTodoList = async (todayTodoEntry, nodes, toMoveToId) => {
 
 const generatePathToNodeString = (node, nodes, documentPath) => {
     const parent = nodes.find(parent => parent.children && parent.children.includes(node.id));
-    if(parent){
+    if (parent) {
         documentPath = parent.content + " > " + documentPath;
         return generatePathToNodeString(parent, nodes, documentPath);
     }
@@ -222,12 +223,12 @@ const archiveCompletedTodos = async () => {
     const journalDocument = await DynalistService.getDocument(config.journalDocumentId);
     const journalNodes = journalDocument.nodes;
     const yesterdayJournalEntry = journalNodes.find(node => node.content.includes(config.yesterdayTag));
-    for (var todayTodoList of todayTodayLists) { 
+    for (var todayTodoList of todayTodayLists) {
         const newNodeContent = generatePathToNodeString(todayTodoList, allNodes, todayTodoList.content);
         const newNodeResult = await DynalistService.createNewEntry(config.journalDocumentId, yesterdayJournalEntry.id, newNodeContent);
         const newNodeId = newNodeResult.new_node_ids[0];
         await archiveTodoList(todayTodoList, allNodes, newNodeId);
-    }  
+    }
 }
 
 const addJournalEntriesToJournal = async () => {
@@ -236,7 +237,7 @@ const addJournalEntriesToJournal = async () => {
     const nodes = await DynalistService.filterNodesByContent(todoDocument, config.journalEntryTag);
     const yesterdayNodes = await DynalistService.filterNodesByContent(journalDocument, config.yesterdayTag);
     const yesterdayNode = yesterdayNodes.length > 0 ? yesterdayNodes[0] : null;
-    if(!yesterdayNode){
+    if (!yesterdayNode) {
         return;
     }
     nodes.forEach(n => n.content = (n.content || '').replace(config.journalEntryTag, ''));
@@ -245,9 +246,10 @@ const addJournalEntriesToJournal = async () => {
 }
 
 (async () => {
-    const api = new DynalistApi(config.dynalistApiKey);
+    try {
+        const api = new DynalistApi(config.dynalistApiKey);
 
-    console.log(await api.getDocument(config.dynalistSharedDocumentId));
+        console.log(await api.getDocument(config.dynalistSharedDocumentId));
 
     const runManualOnly = true;//process.argv.includes("--run-manual-only-tasks");
     if(runManualOnly){
@@ -257,19 +259,25 @@ const addJournalEntriesToJournal = async () => {
         return;
     }
 
-    await flashcardService.updateFlashcardNotes();
-    
-    await journalService.createJournalEntries();
+        await flashcardService.updateFlashcardNotes();
 
-    await archiveCompletedTodos();
+        await journalService.createJournalEntries();
 
-    await addJournalEntriesToJournal();
+        await archiveCompletedTodos();
 
-    await runDynalistUpdates();
+        await addJournalEntriesToJournal();
 
-    await dailiesService.updateDailies();
+        await runDynalistUpdates();
 
-    await inventoryService.updateInventory();
+        await dailiesService.updateDailies();
+
+        await inventoryService.updateInventory();
+        
+        mail.sendSuccessEmail();
+    }
+    catch (error) {
+        mail.sendErrorEmail(e);
+    }
 })();
 
 
